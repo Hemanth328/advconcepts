@@ -1,0 +1,355 @@
+Future :-
+======
+
+ThreadPoolTaskExecutor has a pool of threads, When these threads are in execution the main thread
+does not know the status of it or neither it can collect data the new child thread is giving for
+that reason Future interface has come into the picture.
+
+-> Interface which represents the result of the Async task.
+-> Means, it allows you to check if
+   -> Computation is complete
+   -> Get the result
+   -> Take care of exception if any etc.
+
+Future class consists of 5 methods
+
+1) boolean cancel(boolean mayInterruptIfRunning) => Attempts to cancel the execution of the task.
+  -> Returns false, if task cannot be cancelled (typically bcoz task is
+     already completed) returns true otherwise.
+
+2) boolean isCancelled() => Returns true, if task was cancelled before it gets completed.
+
+3) boolean isDone() => Returns true if this task is completed, completion may be due to normal termination, an exception or cancellation-- all of these cases, this method will return true.
+
+4) V get() => Wait if required, for the completion of the async task
+   -> After task completed, retrieve the result if available.
+
+5) V get(long timeout, TimeUnit unit) => Wait if required, for at most the given timeout period.
+   -> Throws 'TimeoutException' if timeout period finished and
+      task is not yet completed.
+
+
+CompletableFuture :-
+=================
+
+Introduced in Java8
+To help in async Programming
+We can consider it as an advanced version of future provides additional capability like chaining
+
+How to use this :-
+
+1) CompletableFuture.supplyAsync :
+   -------------------------------
+
+  public static<T> CompletableFuture<T> supplyAsync(Supplier<T> supplier)
+
+  public static<T> CompletableFuture<T> supplyAsync(Supplier<T> supplier, Executor executor) // When we don't pass any executor
+          // by default it uses shared Fork-join pool
+
+- supplyAsync method initiates an Async Operation
+- 'supplier' is executed asynchronously in a separate thread.
+- If we want more control on Threads, we can pass Executor in the method
+- By default it uses, shared Fork-Join Pool executor, It dynamically adjust its pool size based on processors.
+
+2) CompletableFuture.thenApply :
+   ---------------------------
+
+   - Apply a function to the result of previous Async computation.
+   - Return a new CompletableFuture object.
+   - Executes synchronously
+
+   Nothing but chaining
+
+   Example :
+
+   CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> return object)
+                                         .thenApply((obj) -> obj);  // Here whatever the supplyAsync method has returned takes that as an input n performs the
+                                                                    // additional logics and return's the CompletableFuture as new Object
+                     The other way of writing the same
+        asyncTask = CompletableFuture.thenApply((obj) -> obj);
+
+
+
+     In this case whatever is created for supplyAsync the same thread will be used to execute the thenApply as well.
+
+
+   CompletableFuture.thenApplyAsync :
+   --------------------------------
+
+   public <U> CompletableFuture<U> thenApplyAsync(Function<? super T,? extends U> fn)
+   public <U> CompletableFuture<U> thenApplyAsync(Function<? super T,? extends U> fn, Executor executor) // Makes use of customized ThreadPoolExecutor
+
+   - Its a Asynchronous execution
+   - Means, it uses different thread(from 'fork-join' pool, if we do not provide the executor
+   - If Multiple 'thenApplyAsync' is used, order can not be guaranteed, but they will run concurrently
+
+   If we dont want the supplyAsync thread to be used for thenApply then we go with thenApplyAsync method n executes asynchronously.
+
+   CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> return object)
+                                            .thenApplyAsync((obj) -> obj);  // Here whatever the supplyAsync method has returned takes that as an input n performs the
+                                                                            // additional logics and return's the CompletableFuture as new Object
+
+     If we want to the supplyAsync to make use of customized executor, then we can pass that executor like shown below
+
+   CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> return object, executor)
+                                               .thenApplyAsync((obj) -> obj, executor);  // When we pass an executor as a parameter instead of using default Fork-Join Pool thread it makes use of
+                                                                                         // customized threadpoolexecutor threads n completes the task
+
+3) CompletableFuture.thenCompose :
+   -----------------------------
+
+   - Chain together dependent async operations.
+   - When next async operation depends on the result of the previous async operation we can tie them together.
+   - for async tasks, we can bring some ordering using this.
+
+    This thenCompose will also use the same thread which is used to execute supplyAsync
+
+    The return type in thenCompose is an extension of CompletionStage<> nothing but it returns a CompletableFuture
+
+    public <U> CompletableFuture<U> thenCompose(Function<? super T, ? extends CompletionStage<U>> fn)
+
+
+    CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> object, executor)
+                                                            .thenCompose( (Object obj) -> {
+                                                                 return CompletableFuture.supplyAsync(obj -> obj);
+                                                            });
+
+
+   CompletableFuture.thenComposeAsync :
+   ----------------------------------
+
+   public <U> CompletableFuture<U> thenComposeAsync(Function<? super T, ? extends CompletionStage<U>> fn)
+
+   public <U> CompletableFuture<U> thenComposeAsync(Function<? super T, ? extends CompletionStage<U>> fn, Executor executor)
+
+   - Multiple thenComposeAsync assures the ordering of the result
+
+   CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> object, executor)
+                                                               .thenComposeAsync( (Object obj) -> {
+                                                                    return CompletableFuture.supplyAsync(obj -> obj);
+                                                               });   // Without the custom executor
+
+   CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> object, executor)
+                                                                  .thenComposeAsync( (Object obj) -> {
+                                                                       return CompletableFuture.supplyAsync(obj -> obj);
+                                                                  }, executor);   // With custom executor
+
+4) CompletableFuture.thenAccept :
+   ----------------------------
+
+   - Generally this is the last stage of in chaining of async operations
+   - It does not return anything
+
+    As it doesn't return anything we take the return type as Void
+
+    CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> object, executor)
+                                                                .thenAccept( (Object obj) -> {
+                                                                     System.out.println("--------- "+obj);
+                                                                }); // Here whatever the supplyAsync method has returned takes that as an input n performs the
+                                                                    // additional logics and does not return anything.
+
+    thenAccept method makes use of same thread which is used to execute the supplyAsync
+
+
+    CompletableFuture.thenAcceptAsync :
+    ---------------------------------
+
+    public CompletableFuture<Void> thenAcceptAsync(Consumer<? super T> action)
+
+    public CompletableFuture<Void> thenAcceptAsync(Consumer<? super T> action, Executor executor)
+
+
+    CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> object, executor)
+                                                                    .thenAccept( (Object obj) -> {
+                                                                         System.out.println("--------- "+obj);
+                                                                    }); // Here whatever the supplyAsync method has returned takes that as an input n performs the
+                                                                        // additional logics and does not return anything.
+
+                                                                        // Without the custom executor
+
+
+    CompletableFuture<Object> asyncTask = CompletableFuture.supplyAsync(() -> object, executor)
+                                                                        .thenAccept( (Object obj) -> {
+                                                                             System.out.println("--------- "+obj);
+                                                                        }, executor); // Here whatever the supplyAsync method has returned takes that as an input n performs the
+                                                                                      // additional logics and does not return anything.
+
+                                                                                      // Without the custom executor
+
+5) CompletableFuture.thenCombine :
+   -----------------------------
+
+   Used to combine the results of two CompletableFuture's
+
+   CompletableFuture<T> asyncTask1 = CompletableFuture.supplyAsync(t -> t);
+
+   CompletableFuture<U> asyncTask2 = CompletableFuture.supplyAsync(u -> u);
+
+   Now if we want to combine the two completable futures then we need to make use of this thenCombine
+
+   CompletableFuture<R> combinedTask = asyncTask1.thenCombine(asyncTask2, (t, u) ->{return "performed logic"});  // This happens synchronously
+
+   Whatever data type this((t, u) ->{return "performed logic"}) lambda returns that should be the data type of combinedTask CompletableFuture
+
+
+   CompletableFuture.thenCombineAsync :
+   ----------------------------------
+
+   public <U,V> CompletableFuture<V> thenCombineAsync(CompletionStage<? extends U> other,
+                                                      BiFunction<? super T,? super U,? extends V> fn)
+
+   public <U,V> CompletableFuture<V> thenCombineAsync(CompletionStage<? extends U> other,
+                                                      BiFunction<? super T,? super U,? extends V> fn,
+                                                      Executor executor)
+
+   CompletableFuture<T> asyncTask1 = CompletableFuture.supplyAsync(t -> t);
+
+   CompletableFuture<U> asyncTask2 = CompletableFuture.supplyAsync(u -> u);
+
+   Now if we want to combine the two completable futures then we need to make use of this thenCombine
+
+   CompletableFuture<R> combinedTask = asyncTask1.thenCombineAsync(asyncTask2, (t, u) ->{return "performed logic"});  // This happens asynchronously with default threadpoolexecutor
+
+   CompletableFuture<R> combinedTask = asyncTask1.thenCombineAsync(asyncTask2, (t, u) ->{return "performed logic"}, executor);  // This happens asynchronously with customized threadpoolexecutor
+
+   Whatever data type this((t, u) ->{return "performed logic"}) lambda returns that should be the data type of combinedTask CompletableFuture
+
+
+   Note : thenCombine can be applied any of them either on asyncTask1 or asyncTask2
+
+
+
+ThreadPool with Executor Utility Methods
+========================================
+
+Executors provide Factory methods which can be used to create ThreadPool Executor present in "java.util.concurrent" package.
+
+1) FixedThreadPoolExecutor :
+   -----------------------
+
+   - 'newFixedThreadPool' method creates a thread pool executor with a fixed number of threads.
+
+
+   _____________________________________________________________________
+  |                               |                                    |
+  | Min and Max Pool size         |     Same                           |
+  |                               |                                    |
+  |     Queue size                |    Unbounded Queue                 |
+  |                               |                                    |
+  | Thread alive when idle        |         Yes                        |
+  |                               |                                    |
+  |    When to use                |  Exact info, how many async        |
+  |                               |  tasks are needed                  |
+  |                               |                                    |
+  |  Disadvantage                 |  Not good when workload is heavy   |
+  |                               |  at it will lead to limited        |
+  |                               |  concurrency                       |
+  |_______________________________|____________________________________|
+
+  Example :
+
+  ExecutorService poolExecutor = Executors.newFixedThreadPool(5);
+  CompletableFuture.supplyAsync(() -> "return", poolExecutor);
+
+2) CachedThreadPoolExecutor :
+   ------------------------
+
+   - 'newCachedThreadPool' method creates a thread poll that creates a
+      new thread as Needed (dynamically).
+
+   __________________________________________________________________________
+  |                               |                                          |
+  | Min and Max Pool size         |   Min : 0, Max : Integer.MAX_VALUE       |
+  |                               |                                          |
+  |     Queue size                |    Blocking Queue with size 0            |
+  |                               |                                          |
+  | Thread alive when idle        |         60seconds                        |
+  |                               |                                          |
+  |    When to use                |  Good for handling burst of              |
+  |                               |  short lived tasks                       |
+  |                               |                                          |
+  |  Disadvantage                 |  Many long lived tasks and submitted     |
+  |                               |  rapidly, ThreadPool can create so many  |
+  |                               |  threads which might lead to increase    |
+  |                               |  memory usage.                           |
+  |_______________________________|__________________________________________|
+
+  Example :
+
+    ExecutorService poolExecutor = Executors.newCachedThreadPool();
+    CompletableFuture.supplyAsync(() -> "return", poolExecutor);
+
+
+3) SingleThreadExecutor :
+   --------------------
+
+   - 'newSingleThreadExecutor' creates Executor with just single worker thread.
+   _____________________________________________________________________
+  |                               |                                    |
+  | Min and Max Pool size         |     Min : 1, Max : 1               |
+  |                               |                                    |
+  |     Queue size                |    Unblocking Queue                |
+  |                               |                                    |
+  | Thread alive when idle        |         Yes                        |
+  |                               |                                    |
+  |    When to use                |  When need to process tasks        |
+  |                               |  sequentially                      |
+  |                               |                                    |
+  |  Disadvantage                 |  No Concurrency at all             |
+  |_______________________________|____________________________________|
+
+  Example :
+
+      ExecutorService poolExecutor = Executors.newSingleThreadExecutor();
+      CompletableFuture.supplyAsync(() -> "return", poolExecutor);
+
+4) WorkStealingPoolExecutor :
+   ------------------------
+
+  - It internally creates a Fork-Join Pool Executor.
+
+  - Number of threads depends upon the available processors or we can specify in the parameter
+
+  - There are 2 queues
+     - Submission Queue
+     - Work-Stealing Queue for each thread(It's a Dequeue)
+
+  - Steps :
+      - If all threads are busy, task would be placed in "Submission Queue" (or whenever we call submit()
+        method, tasks goes into submission queue only)
+
+      - Lets say task1 picked by ThreadA, and If 2 subtasks created using fork() method, subtask1 will be
+        executed by ThreadA only and Subtask2 is put into ThreadA Work-Stealing queue.
+
+      - If any other thread becomes free, and there is no task in submission queue, it can "STEAL" the task
+        from the other thread work-stealing queue.
+
+  - Task can be split in
+  to multiple small sub-tasks, for that Task should extend
+    - Recursive Task (When subtask return's a value)
+    - RecursiveAction (When subtask does not return a value)
+
+  - We can create Fork-Join Pool using "newWorKStealingPool" method in ExecutorService or by calling
+    ForkJoinPool.commonPool() method.
+
+  Example :
+
+        ExecutorService poolExecutor = Executors.newWorKStealingPool();
+        CompletableFuture.supplyAsync(() -> "return", poolExecutor);
+
+                         // OR
+
+        ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
+        CompletableFuture.supplyAsync(() -> new ComputeSumTask(0, 100), forkJoinPool);
+
+        class ComputeSumTask extends RecursiveTask<Integer> {
+
+            public ComputeSumTask(int start, int end) {
+
+            }
+
+            @override
+            protected Integer compute() {
+
+            }
+        }
